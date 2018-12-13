@@ -164,17 +164,20 @@ grid.arrange(g1,g2,g3,g4,g5,g6, ncol = 2, bottom = textGrob("Bedrooms"))
 # Fitting of data to poisson GLM model and checking for over/underdispersion
 #
 #
-poisson.model = glm(bedrooms~., family = "poisson", data = houseDat)
+library(MASS)
+poisson.model = glm(bedrooms~., family = "poisson", data = houseDat) #Run before running qq-plot below
 summary(poisson.model)
 
 poisson.int = glm(bedrooms~1, family = "poisson", data = houseDat)
 
 library(AER)
-disp.test = dispersiontest(poisson.int, alternative = "two.sided")
+disp.test = dispersiontest(poisson.model, alternative = "two.sided")
 #
 # Significant p-value for underdispersion
 # Let's check QQ plot to see if we can determine underdispersion from it
+# 
 #
+#Need to run poisson.model above for below code to work!--------------------------------------
 #
 library(DHARMa)
 sim.res <- simulateResiduals(poisson.model, n = 250)
@@ -189,7 +192,7 @@ ggplot(data = tmp.dat, aes(Expected, Observed, color = Observed)) +
   xlab("Expected residuals")+
   ylab("Observed scaled residuals")+
   theme(legend.position = "none")+
-  geom_text(x = 0.1, y = 0.8, label = "Dispersion = 0.24\np-value significant", color = "black", lwd = 5)
+  geom_text(x = 0.1, y = 0.8, label = "Dispersion = 0.13\np-value significant", color = "black", lwd = 5)
 
 dat.tmp = data.frame(poisson.model$residuals, poisson.model$linear.predictors, houseDat$bedrooms)
 colnames(dat.tmp) = c("residuals", "fitted", "bedrooms")
@@ -208,16 +211,24 @@ houseDat3 = houseDat[,-c(1,2,15)] #removed: id, yr_renovated, date
 # ordinary poisson model and choose predictors from there and then
 # fit COM-poisson model on these predictors
 #
-# OBS: bestglm takes data with target in last column!!!
+# OBS: bestglm takes data with target in last column AND not more than 15 predictors (stupidly enough...)!!!
 #
 library(bestglm)
 #
-# Fix data so works correctly with bestglm
+# Fix data so works correctly with bestglm -----------------------------------------------------------------------
 #
 tmp = houseDat3$bedrooms
 houseDat3 = houseDat3[,-2]
 houseDat3 = as.data.frame(cbind(houseDat3, tmp))
 names(houseDat3)[colnames(houseDat3) == "tmp"] = "Bedrooms"
+houseDat3 = houseDat3[,-16]
 rm(tmp)
+#var.select = bestglm(houseDat3, family = poisson)
+#Nope, takes waaaaay to long. Run with LASSO from glmnet instead
+#-----------------------------------------------------------------------------------------------------------------
 
-var.select = bestglm()
+library(glmnet)
+resp = houseDat3$bedrooms
+pred = data.matrix(houseDat3[,-2])
+poisson.LASSO = glmnet(x = pred, resp, family = "poisson") #With LASSO penalty
+
