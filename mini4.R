@@ -199,11 +199,6 @@ colnames(dat.tmp) = c("residuals", "fitted", "bedrooms")
 
 ggplot(data = dat.tmp, aes(fitted, residuals, color = factor(bedrooms))) +
   geom_point()
-#
-#
-# Remove some predictors that "don't make sense" based on intuition
-#
-houseDat3 = houseDat[,-c(1,2,15)] #removed: id, yr_renovated, date
 
 #
 # glm version of regsubsets. Uses CV to do varaible selection. 
@@ -213,8 +208,12 @@ houseDat3 = houseDat[,-c(1,2,15)] #removed: id, yr_renovated, date
 #
 # OBS: bestglm takes data with target in last column AND not more than 15 predictors (stupidly enough...)!!!
 #
+
+
+
+#DONT USE BELOW
 library(bestglm)
-#
+# 
 # Fix data so works correctly with bestglm -----------------------------------------------------------------------
 #
 tmp = houseDat3$bedrooms
@@ -227,8 +226,26 @@ rm(tmp)
 #Nope, takes waaaaay to long. Run with LASSO from glmnet instead
 #-----------------------------------------------------------------------------------------------------------------
 
+
+#
+#
+# Remove some predictors that "don't make sense" based on intuition
+#
+houseDat3 = houseDat[,-c(1,2,15)] #removed: id, yr_renovated, date
+
+#
+# Run 10-fold CV actross grid of aplha to find optimal lambda.
+#
 library(glmnet)
 resp = houseDat3$bedrooms
 pred = data.matrix(houseDat3[,-2])
-poisson.LASSO = glmnet(x = pred, resp, family = "poisson") #With LASSO penalty
 
+search.grid = seq(0, 1, 0.05)
+search.frame = foreach(i = search.grid, .combine = rbind) %do%{
+  cv.lambda = cv.glmnet(pred, resp, family = "poisson", nfold = 10, alpha = i)
+  data.frame(cvm = cv.lambda$cvm[cv.lambda$lambda == cv.lambda$lambda.min], 
+             lambda.min = cv.lambda$lambda.min, lambda.1se = cv.lambda$lambda.1se, alpha = i)
+}
+best.param = search.frame[search.frame$cvm == min(search.frame$cvm),] #Best alpha = 0.25
+
+poisson.LASSO = glmnet(pred, resp, alpha = best.param$alpha, lambda = best.param$lambda.1se) #Removes sqft_lot, lat, sqft_lot15, sqft_living15
