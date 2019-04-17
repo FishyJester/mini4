@@ -50,7 +50,7 @@ ggplot(data = houseDat, aes(fill = factor(grade))) +
 #
 #
 # Find suitable parameters for a COM-poisson model 
-# TODO: Read up on COM-poisson, what does it do exactly?
+#
 #
 library(compoisson)
 
